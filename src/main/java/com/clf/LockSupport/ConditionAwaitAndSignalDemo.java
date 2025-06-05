@@ -8,7 +8,8 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * ClassName: ConditionAwaitAndSignal
  * Package: com.clf.LockSupport
- * Description:● Condition中的线程等待和唤醒方法，需要先获取锁
+ * Description:
+ * ● Condition中的线程等待和唤醒方法，需要先获取锁
  * ● 一定要先await后signal，不要反了
  *
  * @Author clf
