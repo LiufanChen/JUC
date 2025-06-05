@@ -17,6 +17,10 @@ import java.util.concurrent.*;
  * isDone()方法容易耗费cpu资源（cpu空转），
  * 对于真正的异步处理我们希望是可以通过传入回调函数，在Future结束时自动调用该回调函数，这样，我们就不用等待结果
  * CompletableFuture提供了一种观察者模式类似的机制，可以让任务执行完成后通知监听的一方。
+ *
+ *
+ *
+ * 若没有指定，则使用默认的ForkJoinPoolcommonPool（）作为它的线程池执行异步代码，如果指定线程池，则使用我们自定义的或者特别指定的线程池执行异步代码
  */
 public class CompletableFutureBuildDemo {
     public static void main(String[] args) throws ExecutionException, InterruptedException {
@@ -31,6 +35,7 @@ public class CompletableFutureBuildDemo {
             }
         },executorService);
         System.out.println(completableFuture.get()); //null
+
         CompletableFuture<String> objectCompletableFuture = CompletableFuture.supplyAsync(()->{
             System.out.println(Thread.currentThread().getName());
             try {
@@ -40,6 +45,7 @@ public class CompletableFutureBuildDemo {
             }
             return "hello supplyAsync";
         },executorService);
+
         System.out.println(objectCompletableFuture.get());//hello supplyAsync
         executorService.shutdown();
 
