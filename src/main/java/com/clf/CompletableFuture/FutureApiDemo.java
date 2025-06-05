@@ -45,6 +45,5 @@ public class FutureApiDemo {
                 System.out.println("正在处理中，不要催了，越催越慢");
             }
         }
-
     }
 }
