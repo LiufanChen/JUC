@@ -96,6 +96,8 @@ public class CompletableFutureMallDemo {
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@Accessors(chain = true)//开启链式调用
+
 class NetMall {
     private String netMallName;
 
