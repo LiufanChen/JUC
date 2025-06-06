@@ -43,4 +43,70 @@
 8.对象终结规则（Finalizer Rule）：一个对象的初始化完成（构造函数执行结束）先行发生于它的finalize(）方法的开始------->对象没有完成初始化之前，是不能调用finalized()方法的
 
 
-# volatile
+# volatile （内存屏障Memory Barrier）
+
+两大特性： 
+
+可见性：写完后立即刷新回主内存并及时发出通知，大家可以去主内存拿最新版，前面的修改对后面所有线程可见
+
+有序性（禁重排）：    重排序是指编译器和处理器为了优化程序性能而对指令序列进行重新排序的一种手段，有时候会改变程序语句的先后顺序，若不存在数据依赖关系，可以重排序；存在数据依赖关系，禁止重排序；但重排后的指令绝对不能改变原有的串行语义！这点在并发设计中必须要重点考虑！
+
+
+内存屏障其实就是一种JVM指令，Java内存模型的重排规则会要求Java编译器在生成JVM指令时插入特定的内存屏障指令，通过这些内存屏障指令，volatile实现了Java内存模型中的可见性和有序性（禁重排），但**volatile无法保证原子性**
+
+
+内存屏障之前的所有写操作都要回写到主内存； 内存屏障之后的所有读操作都能获得内存屏障之前的所有写操作的最新结果（实现了可见性）
+
+**因此重排序时，不允许把内存屏障之后的指令重排序到内存屏障之前。一句话：对一个volatile变量的写，先行发生于任意后续对这个volatile变量的读，也叫写后读。**
+
+
+○ 对于编译器的重排序，JMM会根据重排序的规则，禁止特定类型的编译器重排序
+
+○ 对于处理器的重排序，Java编译器在生成指令序列的适当位置，插入内存屏障指令，来禁止特定类型的处理器排序。
+
+读屏障：在每个volatile读操作的后面插入一个LoadLoad屏障或者LoadStore屏障
+<div align=center><img src="Figure/2.png" width = "80%"/></div>
+写屏障：在每个volatile写操作的前面插入StoreStore屏障；在每个volatile写操作的后面插入StoreLoad屏障；
+<div align=center><img src="Figure/3.png" width = "80%"/></div>
+
+**volatile变量的符合操作不具有原子性，写丢失问题**
+
+● volatile写之前的操作，都禁止重排序到volatile之后
+
+● volatile读之后的操作，都禁止重排序到volatile之前
+
+● volatile写之后volatile读，禁止重排序
+
+# LongAdder
+
+LongAdder的基本思路就是分散热点，将value值分散到一个Cell数组中，不同线程会命中到数组的不同槽中，各个线程只对自己槽中的那个值进行CAS操作，这样热点就被分散了，冲突的概率就小很多，如果要获取真正的long值，只要将各个槽中的变量值累加返回
+
+sum()会将所有的Cell数组中的value和base累加作为返回值，核心的思想就是将之前AtomicLong一个value的更新压力分散到多个value中去，从而降级更新热点。
+
+<div align=center><img src="Figure/4.png" width = "80%"/></div>
+
+AtomicLong线程安全，可允许一些性能损耗，要求高精度时可使用，保证精度，多个线程对单个热点值value进行了原子操作-----保证精度，性能代码
+LongAdder当需要在高并发场景下有较好的性能表现，且对值得精确度要求不高时，可以使用，LongAdder时每个线程拥有自己得槽，各个线程一般只对自己槽中得那个值进行CAS操作---保证性能，精度代价
+
+# ThreadLocal
+
+○ ThreadLocalMap实际上就是一个以ThreadLocal实例为Key，任意对象为value的Entry对象
+
+○ 当我们为ThreadLocal变量赋值，实际上就是以当前ThreadLocal实例为Key，值为value的Entry往这个ThreadLocalMap中存放
+
+<div align=center><img src="Figure/5.png" width = "60%"/></div>
+
+JVM内部维护了一个线程版的Map<ThreadLocal, Value>（通过ThreadLocal对象的set方法，结果把ThreadLocal对象自己当作Key，放进了ThreadLocalMap中），每个线程要用到这个T的时候，用当前的线程去Map里面获取，通过这样让每个线程都拥有了自己独立的变量，人手一份，竞争条件被彻底消除，在并发模式下是绝对安全的变量。
+
+弱引用：
+比软引用的生命周期更短，对于只有弱引用的对象而言，只要垃圾回收机制一运行，不管JVM的内存空间是否足够，都会回收该对象占用的内存。
+
+1.ThreadLocal一定要初始化，避免空指针异常。
+
+2.建议把ThreadLocal修饰为static
+
+3.用完记得手动remove
+
+
+
+
