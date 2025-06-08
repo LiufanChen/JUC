@@ -129,3 +129,55 @@ JVM内部维护了一个线程版的Map<ThreadLocal, Value>（通过ThreadLocal�
 
 1、当一个对象已经计算过identity hashcode，它就无法进入偏向锁状态，跳过偏向锁，直接升级轻量级锁；
 2、偏向锁过程中遇到一致性哈希计算请求立马撤销偏向模式，膨胀为重量级锁。
+
+
+# AQS
+**参考美团技术团队博客：https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html**
+
+<div align=center><img src="Figure/6.png" width = "60%"/></div>
+
+
+若通过CAS设置变量State（同步状态）成功，也就是获取锁成功，则将当前线程设置为独占线程。
+
+若通过CAS设置变量State（同步状态）失败，也就是获取锁失败，则进入Acquire方法进行后续处理。
+
+公平锁和非公平锁的lock()方法唯一的区别就在于公平锁在获取同步状态时多了一个限制条件：hasQueuedPredecessors()-----公平锁加锁时判断等待队列中是否存在有效节点的方法
+
+● 公平锁：公平锁讲究先来后到，线程在获取锁时，如果这个锁的等待队列中已经有线程在等待，那么当前线程就会进入到等待队列中；
+
+● 非公平锁：不管是否有等待队列，如果可以获取到锁，则立刻占有锁对象。也就是说队列的第一个排队线程苏醒后，不一定就是排头的这个线程获得锁，它还需要参加竞争锁（存在线程竞争的情况下），后来的线程可能不讲武德插队夺锁了。
+
+# AQS框架
+
+<div align=center><img src="Figure/8.png" width = "90%"/></div>
+
+图中有颜色的为Method，无颜色的为Attribution。
+
+总的来说，AQS框架共分为五层，自上而下由浅入深，从AQS对外暴露的API到底层基础数据。
+
+当有自定义同步器接入时，只需重写第一层所需要的部分方法即可，不需要关注底层具体的实现流程。当自定义同步器进行加锁或者解锁操作时，先经过第一层的API进入AQS内部方法，然后经过第二层进行锁的获取，接着对于获取锁失败的流程，进入第三层和第四层的等待队列处理，而这些处理方式均依赖于第五层的基础数据提供层。
+
+<div align=center><img src="Figure/7.png" width = "60%"/></div>
+
+AQS核心思想是，如果被请求的共享资源空闲，那么就将当前请求资源的线程设置为有效的工作线程，将共享资源设置为锁定状态；如果共享资源被占用，就需要一定的阻塞等待唤醒机制来保证锁分配。这个机制主要用的是CLH队列的变体实现的，将暂时获取不到锁的线程加入到队列中。
+
+**同步状态State**
+
+<div align=center><img src="Figure/9.png" width = "40%"/></div>
+<div align=center><img src="Figure/10.png" width = "40%"/></div>
+
+非公平锁与AQS之间方法的关联之处
+<div align=center><img src="Figure/11.png" width = "40%"/></div>
+
+通过ReentrantLock的加锁方法Lock进行加锁操作。 会调用到内部类Sync的Lock方法，由于Sync#lock是抽象方法，根据ReentrantLock初始化选择的公平锁和非公平锁，执行相关内部类的Lock方法，本质上都会执行AQS的Acquire方法。 AQS的Acquire方法会执行tryAcquire方法，但是由于tryAcquire需要自定义同步器实现，因此执行了ReentrantLock中的tryAcquire方法，由于ReentrantLock是通过公平锁和非公平锁内部类实现的tryAcquire方法，因此会根据锁类型不同，执行不同的tryAcquire。 tryAcquire是获取锁逻辑，获取失败后，会执行框架AQS的后续逻辑，跟ReentrantLock自定义同步器无关。
+
+Acquire方法：如果tryAcquire方法返回了True，则说明当前线程获取锁成功，就不用往后执行了；如果获取失败，就调用addWaiter加入到等待队列中。
+
+请注意，初始化的头结点并不是当前线程节点，而是调用了无参构造函数的节点。如果经历了初始化或者并发导致队列中有元素，则与之前的方法相同。其实，addWaiter就是一个在双端链表添加尾节点的操作，需要注意的是，双端链表的头结点是一个无参构造函数的头结点。
+
+**addWaiter方法**，这个方法其实就是把对应的线程以Node的数据结构形式加入到双端队列里，返回的是一个包含该线程的Node。而这个Node会作为参数，进入到acquireQueued方法中。acquireQueued方法可以对排队中的线程进行“获锁”操作。
+
+<div align=center><img src="Figure/12.png" width = "40%"/></div>
+
+跳出当前循环的条件是当“前置节点是头结点，且当前线程获取锁成功”。为了防止因死循环导致CPU资源被浪费，我们会判断前置节点的状态来决定是否要将当前线程挂起，具体挂起流程用流程图表示如下（shouldParkAfterFailedAcquire流程）：
+<div align=center><img src="Figure/13.png" width = "40%"/></div>
